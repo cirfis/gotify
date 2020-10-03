@@ -1,0 +1,23 @@
+FROM --platform=$BUILDPLATFORM golang:buster as build-env
+# Install TARGETPLATFORM parser to translate its value to GOOS, GOARCH, and GOARM
+COPY --from=tonistiigi/xx:golang / /
+# Bring TARGETPLATFORM to the build scope
+ARG TARGETPLATFORM
+
+## Download and Extract
+ADD https://github.com/gotify/server/archive/v2.0.17.tar.gz ./
+RUN tar -xzavf v2.0.17.tar.gz
+
+# Build using GOOS, GOARCH, and GOARM
+RUN cd server-2.0.17 && /go/bin/go build -a -o ../gotify-app .
+
+FROM ubuntu
+
+WORKDIR /app/
+
+COPY --from=build-env /go/gotify-app ./
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s CMD curl --fail http://localhost:$GOTIFY_SERVER_PORT/health || exit 1
+ENV GOTIFY_SERVER_PORT="80"
+EXPOSE 80
+ENTRYPOINT ["./gotify-app"]
